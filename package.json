@@ -1,0 +1,13 @@
+{
+	"name": "aha-ai-exam",
+	"author": "Kevin Hernandez-Rives <rurunosep@gmail.com>",
+	"private": true,
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/rurunosep/aha-ai-exam.git"
+	},
+	"workspaces": [
+		"./client",
+		"./server"
+	]
+}
