@@ -4,14 +4,16 @@ import express from 'express'
 import session from 'express-session'
 import connectPgSimple from 'connect-pg-simple'
 import passport from 'passport'
+import sendgrid from '@sendgrid/mail'
 import path from 'path'
 import authRoute from './api/auth.js'
 
 const app = express()
 
-// Misc
 app.use(express.json())
 app.use(express.static(path.join(__dirname, '..', 'client', 'dist')))
+
+sendgrid.setApiKey(process.env.SENDGRID_API_KEY!)
 
 // Session
 const sessionStore = new (connectPgSimple(session))({

@@ -1,6 +1,8 @@
 import express from 'express'
 import bcrypt from 'bcrypt'
+import crypto from 'crypto'
 import passport from 'passport'
+import sendgrid from '@sendgrid/mail'
 import sql from '../db.js'
 
 const router = express.Router()
@@ -9,7 +11,7 @@ router.post('/login', (req, res) => {
 	passport.authenticate('local', (err: any, user: any) => {
 		req.login(user, () => {
 			if (!user) return res.status(401).send('Invalid username or password')
-			res.send(`Successfully logged in ${user.email}`)
+			res.send(`Logged in ${user.email}`)
 			// TODO redirect to dashboard
 		})
 	})(req, res)
@@ -19,14 +21,13 @@ router.get('/logout', (req, res) => {
 	const userBeforeLogout = req.user
 	req.logout((err) => {
 		if (!userBeforeLogout) return res.status(400).send('No user logged in.')
-		res.send(`Successfully logged out ${userBeforeLogout.email}`)
+		res.send(`Logged out ${userBeforeLogout.email}`)
 		// TODO redirect to landing page
 	})
 })
 
 router.post('/register', async (req, res) => {
 	const { email, password } = req.body
-
 	if (!email || !password) return res.status(400).send('Invalid request.')
 
 	// TODO more validation
@@ -37,14 +38,60 @@ router.post('/register', async (req, res) => {
 	const salt = await bcrypt.genSalt()
 	const password_hash = await bcrypt.hash(password, salt)
 
-	const inserted = await sql`
-    INSERT INTO user_account (email, password_hash)
-    VALUES (${email}, ${password_hash})
+	const inserted = (
+		await sql`
+    INSERT INTO user_account (email, password_hash, verified)
+    VALUES (${email}, ${password_hash}, false)
     RETURNING *
   `
-	if (inserted.count < 1) return res.status(500)
+	)[0]
+	if (!inserted) return res.status(500)
+
+	const verification_key = crypto.randomUUID()
+
+	await sql`
+		INSERT INTO user_verification (user_id, verification_key)
+		VALUES (${inserted.id}, ${verification_key})
+	`
+
+	const verification_url = `${process.env.SERVER_URL}/api/auth/verify?key=${verification_key}`
+
+	sendgrid.send({
+		to: email,
+		from: 'rurunosep@gmail.com',
+		subject: 'Aha AI Exam - Email Verification',
+		html: `<a href="${verification_url}">${verification_url}</a>`,
+	})
 
 	res.send(`Registered ${email}.`)
+})
+
+router.get('/verify', async (req, res) => {
+	const key = req.query.key?.toString()
+	if (!key) return res.status(400)
+
+	const user = (
+		await sql<{ id: number; email: string }[]>`
+		SELECT a.id, a.email
+		FROM user_verification v
+		INNER JOIN user_account a ON a.id = v.user_id 
+		WHERE verification_key=${key}
+	`
+	)[0]
+	if (!user) return res.status(400)
+
+	await sql`
+	UPDATE user_account
+	SET verified=true
+	WHERE id=${user.id}
+	`
+
+	await sql`
+	DELETE FROM user_verification
+	WHERE user_id=${user.id}
+	`
+
+	res.send(`Verified ${user.email}`)
 })
 
 export default router
