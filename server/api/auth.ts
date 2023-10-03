@@ -20,7 +20,7 @@ router.post('/login', (req, res) => {
 router.get('/logout', (req, res) => {
 	const userBeforeLogout = req.user
 	req.logout((err) => {
-		if (!userBeforeLogout) return res.status(400).send('No user logged in.')
+		if (!userBeforeLogout) return res.status(401).send('No user logged in')
 		res.send(`Logged out ${userBeforeLogout.email}`)
 		// TODO redirect to landing page
 	})
@@ -28,12 +28,11 @@ router.get('/logout', (req, res) => {
 
 router.post('/register', async (req, res) => {
 	const { email, password } = req.body
-	if (!email || !password) return res.status(400).send('Invalid request.')
-
+	if (!email || !password) return res.status(400).send()
 	// TODO more validation
 
 	if ((await sql`SELECT email FROM user_account WHERE email=${email}`).count > 0)
-		return res.status(400).send('User already exists.')
+		return res.status(400).send('User already exists')
 
 	const salt = await bcrypt.genSalt()
 	const password_hash = await bcrypt.hash(password, salt)
@@ -45,7 +44,7 @@ router.post('/register', async (req, res) => {
     RETURNING *
   `
 	)[0]
-	if (!inserted) return res.status(500)
+	if (!inserted) return res.status(500).send()
 
 	const verification_key = crypto.randomUUID()
 
@@ -63,12 +62,12 @@ router.post('/register', async (req, res) => {
 		html: `<a href="${verification_url}">${verification_url}</a>`,
 	})
 
-	res.send(`Registered ${email}.`)
+	res.send(`Registered ${email}`)
 })
 
 router.get('/verify', async (req, res) => {
 	const key = req.query.key?.toString()
-	if (!key) return res.status(400)
+	if (!key) return res.status(400).send()
 
 	const user = (
 		await sql<{ id: number; email: string }[]>`
@@ -78,7 +77,7 @@ router.get('/verify', async (req, res) => {
 		WHERE verification_key=${key}
 	`
 	)[0]
-	if (!user) return res.status(400)
+	if (!user) return res.status(400).send()
 
 	await sql`
 	UPDATE user_account
@@ -94,4 +93,43 @@ router.get('/verify', async (req, res) => {
 	res.send(`Verified ${user.email}`)
 })
 
+// TODO move these routes somewhere else?
+
+router.post('/change-password', async (req, res) => {
+	const { oldPassword, newPassword } = req.body
+	if (!oldPassword || !newPassword) return res.status(400).send()
+	// TODO more validation
+
+	const user = req.user
+	if (!user) return res.status(401).send('No user logged in')
+
+	const isMatch = await bcrypt.compare(oldPassword, user.password_hash)
+	if (!isMatch) return res.status(401).send('Incorrect old password')
+
+	const salt = await bcrypt.genSalt()
+	const password_hash = await bcrypt.hash(newPassword, salt)
+
+	await sql`
+	UPDATE user_account
+	SET password_hash=${password_hash}
+	WHERE id=${user.id}
+	`
+
+	res.send(`Changed password for ${user.email}`)
+})
+
+router.post('/change-name', async (req, res) => {
+	const { newName } = req.body
+	if (!newName) return res.status(400).send()
+
+	const user = req.user
+	if (!user) return res.status(401).send('No user logged in')
+
+	await sql`
+	UPDATE user_account
+	SET name=${newName}
+	`
+
+	res.send(`Changed name to ${newName}`)
+})
 export default router

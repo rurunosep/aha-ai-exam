@@ -6,7 +6,13 @@ import { IUser } from './types'
 
 passport.use(
 	new LocalStrategy({ usernameField: 'email' }, async (email, password, done) => {
-		const user = (await sql<IUser[]>`SELECT * FROM user_account WHERE email=${email}`)[0]
+		const user = (
+			await sql<IUser[]>`
+		SELECT id, email, password_hash, name
+		FROM user_account
+		WHERE email=${email}
+		`
+		)[0]
 		if (!user) return done(null, false)
 
 		const isMatch = await bcrypt.compare(password, user.password_hash)
@@ -21,7 +27,11 @@ passport.serializeUser((user, done) => {
 })
 
 passport.deserializeUser((id: number, done) => {
-	sql<IUser[]>`SELECT * FROM user_account WHERE id=${id}`.then((rows) => {
+	sql<IUser[]>`
+	SELECT id, email, password_hash, name
+	FROM user_account
+	WHERE id=${id}
+	`.then((rows) => {
 		if (rows.count < 1) {
 			return done(null, false)
 		} else {
