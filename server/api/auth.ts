@@ -4,19 +4,35 @@ import crypto from 'crypto'
 import passport from 'passport'
 import sendgrid from '@sendgrid/mail'
 import sql from '../db.js'
+import { validatePassword } from '../utils.js'
+import { IUser } from '../types.js'
 
 const router = express.Router()
 
+// POST /api/auth/login
+// TODO failure redirect
 router.post('/login', (req, res) => {
-	passport.authenticate('local', (err: any, user: any) => {
+	passport.authenticate('local', (err: any, user: IUser | false) => {
+		if (!user) return res.status(401).send('Invalid username or password')
 		req.login(user, () => {
-			if (!user) return res.status(401).send('Invalid username or password')
+			console.log(req.user)
 			res.send(`Logged in ${user.email}`)
 			// TODO redirect to dashboard
 		})
 	})(req, res)
 })
 
+// GET /api/auth/google
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }))
+
+// GET /api/auth/google/callback
+// TODO failure redirect
+router.get('/google/callback', passport.authenticate('google'), (req, res) => {
+	res.send(`Logged in ${req.user?.displayName} with Google`)
+	// TODO redirect to dashboard
+})
+
+// GET /api/auth/logout
 router.get('/logout', (req, res) => {
 	const userBeforeLogout = req.user
 	req.logout((err) => {
@@ -26,25 +42,34 @@ router.get('/logout', (req, res) => {
 	})
 })
 
+// POST /api/auth/register
 router.post('/register', async (req, res) => {
 	const { email, password } = req.body
 	if (!email || !password) return res.status(400).send()
-	// TODO more validation
 
-	if ((await sql`SELECT email FROM user_account WHERE email=${email}`).count > 0)
+	if (!validatePassword(password)) return res.status(400).send('Invalid password')
+
+	if (
+		(
+			await sql`
+				SELECT 1
+				FROM user_account
+				WHERE email=${email} AND google_id IS NULL
+			`
+		).count > 0
+	)
 		return res.status(400).send('User already exists')
 
 	const salt = await bcrypt.genSalt()
 	const password_hash = await bcrypt.hash(password, salt)
 
 	const inserted = (
-		await sql`
-    INSERT INTO user_account (email, password_hash, verified)
-    VALUES (${email}, ${password_hash}, false)
-    RETURNING *
-  `
+		await sql<{ id: number }[]>`
+			INSERT INTO user_account (email, password_hash, verified)
+			VALUES (${email}, ${password_hash}, false)
+			RETURNING id
+  	`
 	)[0]
-	if (!inserted) return res.status(500).send()
 
 	const verification_key = crypto.randomUUID()
 
@@ -53,7 +78,7 @@ router.post('/register', async (req, res) => {
 		VALUES (${inserted.id}, ${verification_key})
 	`
 
-	const verification_url = `${process.env.SERVER_URL}/api/auth/verify?key=${verification_key}`
+	const verification_url = `${process.env.SERVER_URL}/api/auth/verify-email?key=${verification_key}`
 
 	sendgrid.send({
 		to: email,
@@ -65,71 +90,33 @@ router.post('/register', async (req, res) => {
 	res.send(`Registered ${email}`)
 })
 
-router.get('/verify', async (req, res) => {
+// GET /api/auth/verify-email
+router.get('/verify-email', async (req, res) => {
 	const key = req.query.key?.toString()
 	if (!key) return res.status(400).send()
 
 	const user = (
 		await sql<{ id: number; email: string }[]>`
-		SELECT a.id, a.email
-		FROM user_verification v
-		INNER JOIN user_account a ON a.id = v.user_id 
-		WHERE verification_key=${key}
+			SELECT a.id, a.email
+			FROM user_verification v
+			INNER JOIN user_account a ON a.id = v.user_id 
+			WHERE verification_key=${key}
 	`
 	)[0]
 	if (!user) return res.status(400).send()
 
 	await sql`
-	UPDATE user_account
-	SET verified=true
-	WHERE id=${user.id}
+		UPDATE user_account
+		SET verified=true
+		WHERE id=${user.id}
 	`
 
 	await sql`
-	DELETE FROM user_verification
-	WHERE user_id=${user.id}
+		DELETE FROM user_verification
+		WHERE user_id=${user.id}
 	`
 
 	res.send(`Verified ${user.email}`)
 })
 
-// TODO move these routes somewhere else?
-
-router.post('/change-password', async (req, res) => {
-	const { oldPassword, newPassword } = req.body
-	if (!oldPassword || !newPassword) return res.status(400).send()
-	// TODO more validation
-
-	const user = req.user
-	if (!user) return res.status(401).send('No user logged in')
-
-	const isMatch = await bcrypt.compare(oldPassword, user.password_hash)
-	if (!isMatch) return res.status(401).send('Incorrect old password')
-
-	const salt = await bcrypt.genSalt()
-	const password_hash = await bcrypt.hash(newPassword, salt)
-
-	await sql`
-	UPDATE user_account
-	SET password_hash=${password_hash}
-	WHERE id=${user.id}
-	`
-
-	res.send(`Changed password for ${user.email}`)
-})
-
-router.post('/change-name', async (req, res) => {
-	const { newName } = req.body
-	if (!newName) return res.status(400).send()
-
-	const user = req.user
-	if (!user) return res.status(401).send('No user logged in')
-
-	await sql`
-	UPDATE user_account
-	SET name=${newName}
-	`
-
-	res.send(`Changed name to ${newName}`)
-})
 export default router
