@@ -1,53 +1,62 @@
-import { useState } from 'react'
+import { useCallback, useContext, useEffect, useState } from 'react'
+import axios from 'axios'
+import { Context } from './context'
+import LandingPage from './LandingPage'
+import DashboardPage from './DashboardPage'
 
 export default function App() {
-	const [fields, setFields] = useState({ email: '', password1: '', password2: '' })
+	const [user, setUser] = useState<IUser | null>(null)
 
-	const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		setFields({ ...fields, [e.target.name]: e.target.value })
-	}
+	const { alert, setAlert } = useContext(Context)
 
-	const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-		e.preventDefault()
-
-		fetch('/api/register', {
-			method: 'POST',
-			headers: {
-				Accept: 'application/json',
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({ username: fields.email, password: fields.password1 }),
+	// Get authenticated user of the current session
+	useEffect(() => {
+		axios.get('api/auth/user').then((res) => {
+			setUser(res.data ? res.data : null)
 		})
-			.then((res) => res.text())
-			.then((text) => console.log(text))
-	}
+	}, [])
+
+	const login = useCallback((email: string, password: string) => {
+		axios
+			.post('api/auth/login', { email, password })
+			.then(() => axios.get('api/auth/user'))
+			.then((res) => {
+				setUser(res.data ? res.data : null)
+			})
+			.catch((err) => {
+				setAlert({ message: err.response.data, type: 'danger' })
+			})
+	}, [])
+
+	const logout = useCallback(() => {
+		axios.get('api/auth/logout').then(() => {
+			setUser(null)
+		})
+	}, [])
+
+	// TODO login user immediately?
+	const register = useCallback((email: string, password: string) => {
+		axios
+			.post('api/auth/register', { email, password })
+			.then((res) => setAlert({ message: res.data, type: 'primary' }))
+			.catch((err) => setAlert({ message: err.response.data, type: 'danger' }))
+	}, [])
+
+	const alertElement = alert && (
+		<div className={`alert alert-${alert.type} alert-dismissible`} role='alert'>
+			{alert.message}
+			<button type='button' className='btn-close' onClick={() => setAlert(null)}></button>
+		</div>
+	)
 
 	return (
-		<div>
-			<form onSubmit={onSubmit}>
-				<input
-					type='email'
-					name='email'
-					placeholder='Email'
-					value={fields.email}
-					onChange={onChange}
-				/>
-				<input
-					type='password'
-					name='password1'
-					placeholder='Password'
-					value={fields.password1}
-					onChange={onChange}
-				/>
-				<input
-					type='password'
-					name='password2'
-					placeholder='Confirm Password'
-					value={fields.password2}
-					onChange={onChange}
-				/>
-				<button type='submit'>Register</button>
-			</form>
+		<div className='container mt-3'>
+			{alertElement}
+			{user ? (
+				<DashboardPage logout={logout} user={user} />
+			) : (
+				<LandingPage login={login} register={register} />
+			)}
 		</div>
 	)
 }

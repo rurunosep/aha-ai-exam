@@ -9,45 +9,63 @@ import { IUser } from '../types.js'
 
 const router = express.Router()
 
+// GET /api/auth/user
+// Get the user of the current session
+// Response JSON: {id, email, displayName, verified}
+// (Empty response body if no user)
+router.get('/user', (req, res) => {
+	if (!req.user) return res.status(200).send()
+
+	res.status(200).send({
+		id: req.user.id,
+		email: req.user.email,
+		displayName: req.user.displayName,
+		verified: req.user.verified,
+	})
+})
+
 // POST /api/auth/login
-// TODO failure redirect
+// Log in user with email and password
+// Request JSON: {email, password}
 router.post('/login', (req, res) => {
-	passport.authenticate('local', (err: any, user: IUser | false) => {
-		if (!user) return res.status(401).send('Invalid username or password')
-		req.login(user, () => {
-			console.log(req.user)
-			res.send(`Logged in ${user.email}`)
-			// TODO redirect to dashboard
+	passport.authenticate('local', (err: any, user: IUser | null) => {
+		if (!user) return res.status(401).send('Invalid username or password.')
+		req.logIn(user, () => {
+			res.status(200).send(`Logged in ${user.email}.`)
 		})
 	})(req, res)
 })
 
 // GET /api/auth/google
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }))
+// Log in with Google OAuth
+router.get('/google', passport.authenticate('google'))
 
 // GET /api/auth/google/callback
-// TODO failure redirect
+// The callback URL that Google sends authentication result to
 router.get('/google/callback', passport.authenticate('google'), (req, res) => {
-	res.send(`Logged in ${req.user?.displayName} with Google`)
-	// TODO redirect to dashboard
+	// TODO
+	res.redirect('http://localhost:5173')
 })
 
 // GET /api/auth/logout
+// Log out the current session user
 router.get('/logout', (req, res) => {
-	const userBeforeLogout = req.user
+	const user = req.user
+	if (!user) return res.status(200).send('No user logged in.')
 	req.logout((err) => {
-		if (!userBeforeLogout) return res.status(401).send('No user logged in')
-		res.send(`Logged out ${userBeforeLogout.email}`)
-		// TODO redirect to landing page
+		res.status(200).send(`Logged out ${user.email}`)
 	})
 })
 
 // POST /api/auth/register
+// Register a new user with email and password
+// Request Body: {email, password}
 router.post('/register', async (req, res) => {
 	const { email, password } = req.body
-	if (!email || !password) return res.status(400).send()
+	if (typeof email != 'string' || email.length > 255 || typeof password != 'string')
+		return res.status(400).send()
 
-	if (!validatePassword(password)) return res.status(400).send('Invalid password')
+	if (!validatePassword(password)) return res.status(400).send('Invalid password.')
 
 	if (
 		(
@@ -58,7 +76,7 @@ router.post('/register', async (req, res) => {
 			`
 		).count > 0
 	)
-		return res.status(400).send('User already exists')
+		return res.status(409).send('User already exists.')
 
 	const salt = await bcrypt.genSalt()
 	const password_hash = await bcrypt.hash(password, salt)
@@ -87,10 +105,11 @@ router.post('/register', async (req, res) => {
 		html: `<a href="${verification_url}">${verification_url}</a>`,
 	})
 
-	res.send(`Registered ${email}`)
+	res.status(201).send(`Registered ${email} and sent verification email.`)
 })
 
 // GET /api/auth/verify-email
+// Verify the email of an unverified user
 router.get('/verify-email', async (req, res) => {
 	const key = req.query.key?.toString()
 	if (!key) return res.status(400).send()
@@ -116,7 +135,7 @@ router.get('/verify-email', async (req, res) => {
 		WHERE user_id=${user.id}
 	`
 
-	res.send(`Verified ${user.email}`)
+	res.status(200).send(`Verified ${user.email}.`)
 })
 
 export default router

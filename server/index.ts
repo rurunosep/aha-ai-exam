@@ -7,11 +7,12 @@ import passport from 'passport'
 import sendgrid from '@sendgrid/mail'
 import path from 'path'
 import authRoute from './api/auth.js'
+import userRoute from './api/user.js'
 
 const app = express()
 
 app.use(express.json())
-app.use(express.static(path.join(__dirname, '..', 'client', 'dist')))
+app.use(express.static(path.join(__dirname, '..', '..', 'client', 'dist')))
 
 sendgrid.setApiKey(process.env.SENDGRID_API_KEY!)
 
@@ -39,8 +40,9 @@ import('./passport.js')
 app.use(passport.initialize())
 app.use(passport.session())
 
-// Routes
+// API
 app.use('/api/auth', authRoute)
+app.use('/api/user', userRoute)
 
 // Start
 const port = process.env.PORT

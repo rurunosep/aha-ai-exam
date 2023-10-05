@@ -1,9 +1,10 @@
 export interface IUser {
 	id: number
 	email: string
+	displayName: string
+	verified: boolean
 	passwordHash?: string
 	googleId?: string
-	displayName: string
 }
 
 declare global {

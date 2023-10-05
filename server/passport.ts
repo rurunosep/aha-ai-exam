@@ -31,14 +31,16 @@ passport.use(
 			clientID: process.env.GOOGLE_CLIENT_ID!,
 			clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
 			callbackURL: '/api/auth/google/callback',
+			scope: ['email', 'profile'],
 		},
-		async (accessToken, refreshToken, profile, done) => {
+		async (_accessToken, _refreshToken, profile, done) => {
 			const user = (
 				await sql<IUser[]>`
 					SELECT id,
 						email,
-						google_id AS "googleId",
-						display_name AS "displayName"
+						display_name AS "displayName",
+						verified,
+						google_id AS "googleId"
 					FROM user_account
 					WHERE google_id=${profile.id}
 				`
@@ -50,14 +52,16 @@ passport.use(
 				const email = profile.emails?.[0].value!
 				const newUser = (
 					await sql<IUser[]>`
-						INSERT INTO user_account (email, google_id, display_name)
-						VALUES (${email}, ${profile.id}, ${profile.name?.givenName || ''})
+						INSERT INTO user_account (email, google_id, display_name, verified)
+						VALUES (${email}, ${profile.id}, ${profile.name?.givenName || ''}, true)
 						RETURNING id,
 							email,
 							google_id AS "googleId",
-							display_name AS "displayName"
+							display_name AS "displayName",
+							verified
 					`
 				)[0]
+
 				return done(null, newUser)
 			}
 
@@ -74,9 +78,10 @@ passport.deserializeUser((id: number, done) => {
 	sql<IUser[]>`
 		SELECT id,
 			email,
+			display_name AS "displayName",
+			verified,
 			password_hash AS "passwordHash",
-			google_id AS "googleId",
-			display_name AS "displayName"
+			google_id AS "googleId"
 		FROM user_account
 		WHERE id=${id}
 	`.then((rows) => {
