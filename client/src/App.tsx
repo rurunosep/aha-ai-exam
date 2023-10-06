@@ -53,16 +53,18 @@ export default function App() {
 	const changePassword = useCallback((oldPassword: string, newPassword: string) => {
 		axios
 			.post('api/user/change-password', { oldPassword, newPassword })
-			.then((res) => setAlert({ message: res.data, type: 'primary' }))
+			.then((res) => setAlert({ message: res.data, type: 'success' }))
 			.catch((err) => setAlert({ message: err.response.data, type: 'danger' }))
 	}, [])
 
 	//
-	// TODO login user immediately?
 	const register = useCallback((email: string, password: string) => {
 		axios
 			.post('api/auth/register', { email, password })
-			.then((res) => setAlert({ message: res.data, type: 'primary' }))
+			.then((res) => {
+				setAlert({ message: res.data, type: 'success' })
+				login(email, password)
+			})
 			.catch((err) => setAlert({ message: err.response.data, type: 'danger' }))
 	}, [])
 

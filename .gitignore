@@ -4,4 +4,5 @@
 /client/dist
 /server/dist
 .env
+*.session.sql
 scratchpad.js

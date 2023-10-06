@@ -54,6 +54,7 @@ router.get('/google', passport.authenticate('google'))
 router.get('/google/callback', passport.authenticate('google'), (req, res) => {
 	if (req.user) incrementLoginCount(req.user)
 	// TODO
+	// res.redirect('/')
 	res.redirect('http://localhost:5173')
 })
 
@@ -89,30 +90,30 @@ router.post('/register', async (req, res) => {
 		return res.status(409).send('User already exists.')
 
 	const salt = await bcrypt.genSalt()
-	const password_hash = await bcrypt.hash(password, salt)
+	const passwordHash = await bcrypt.hash(password, salt)
 
 	const inserted = (
 		await sql<{ id: number }[]>`
 			INSERT INTO user_account (email, password_hash, verified)
-			VALUES (${email}, ${password_hash}, false)
+			VALUES (${email}, ${passwordHash}, false)
 			RETURNING id
   	`
 	)[0]
 
-	const verification_key = crypto.randomUUID()
+	const verificationKey = crypto.randomUUID()
 
 	await sql`
 		INSERT INTO user_verification (user_id, verification_key)
-		VALUES (${inserted.id}, ${verification_key})
+		VALUES (${inserted.id}, ${verificationKey})
 	`
 
-	const verification_url = `${process.env.SERVER_URL}/api/auth/verify-email?key=${verification_key}`
+	const verificationUrl = `${process.env.SERVER_URL}/api/auth/verify-email?key=${verificationKey}`
 
 	sendgrid.send({
 		to: email,
 		from: 'rurunosep@gmail.com',
 		subject: 'Aha AI Exam - Email Verification',
-		html: `<a href="${verification_url}">${verification_url}</a>`,
+		html: `<a href="${verificationUrl}">${verificationUrl}</a>`,
 	})
 
 	res.status(201).send(`Registered ${email} and sent verification email.`)
@@ -122,17 +123,14 @@ router.post('/register', async (req, res) => {
 // Verify the email of an unverified user
 // Query Params: key
 router.get('/verify-email', async (req, res) => {
-	const key = req.query.key?.toString()
-	// TODO
-	// const key = req.query.key as string
-	if (!key) return res.status(400).send()
+	if (typeof req.query.key != 'string') return res.status(400).send()
 
 	const user = (
 		await sql<{ id: number; email: string }[]>`
 			SELECT a.id, a.email
 			FROM user_verification v
 			INNER JOIN user_account a ON a.id = v.user_id 
-			WHERE verification_key=${key}
+			WHERE verification_key=${req.query.key}
 	`
 	)[0]
 	if (!user) return res.status(400).send()
@@ -148,7 +146,36 @@ router.get('/verify-email', async (req, res) => {
 		WHERE user_id=${user.id}
 	`
 
-	res.status(200).send(`Verified ${user.email}.`)
+	// TODO
+	// res.redirect('/')
+	res.redirect('http://localhost:5173')
+})
+
+// GET /api/auth/resend-verification-email
+// Resend verification email to current unverified session user
+router.get('/resend-verification-email', async (req, res) => {
+	if (!req.user) return res.status(401).send('No user logged in.')
+
+	const key = (
+		await sql`
+		SELECT verification_key
+		FROM user_verification
+		WHERE user_id = ${req.user.id}
+	`
+	)[0]?.verification_key
+
+	if (!key) return res.status(400).send('User already verified.')
+
+	const url = `${process.env.SERVER_URL}/api/auth/verify-email?key=${key}`
+
+	sendgrid.send({
+		to: req.user.email,
+		from: 'rurunosep@gmail.com',
+		subject: 'Aha AI Exam - Email Verification',
+		html: `<a href="${url}">${url}</a>`,
+	})
+
+	res.status(200).send('Verification email sent.')
 })
 
 export default router
