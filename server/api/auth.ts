@@ -53,9 +53,7 @@ router.get('/google', passport.authenticate('google'))
 // The callback URL that Google sends authentication result to
 router.get('/google/callback', passport.authenticate('google'), (req, res) => {
 	if (req.user) incrementLoginCount(req.user)
-	// TODO
-	// res.redirect('/')
-	res.redirect('http://localhost:5173')
+	res.redirect('/')
 })
 
 // GET /api/auth/logout
@@ -146,9 +144,7 @@ router.get('/verify-email', async (req, res) => {
 		WHERE user_id=${user.id}
 	`
 
-	// TODO
-	// res.redirect('/')
-	res.redirect('http://localhost:5173')
+	res.redirect('/')
 })
 
 // GET /api/auth/resend-verification-email

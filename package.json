@@ -9,5 +9,9 @@
 	"workspaces": [
 		"./client",
 		"./server"
-	]
+	],
+	"scripts": {
+		"start": "npm run start --prefix server",
+		"build": "npm run build --prefix server && npm run build --prefix client"
+	}
 }
