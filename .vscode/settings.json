@@ -1,0 +1,14 @@
+{
+	"sqltools.connections": [
+		{
+			"previewLimit": 50,
+			"server": "localhost",
+			"driver": "PostgreSQL",
+			"name": "aha-ai-exam",
+			"database": "aha-ai-exam",
+			"username": "postgres",
+			"password": "pass",
+			"connectString": "postgres://postgres:pass@localhost:5432/aha-ai-exam"
+		}
+	]
+}

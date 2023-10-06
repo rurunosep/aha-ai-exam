@@ -8,6 +8,8 @@ import sendgrid from '@sendgrid/mail'
 import path from 'path'
 import authRoute from './api/auth.js'
 import userRoute from './api/user.js'
+import dataRoute from './api/data.js'
+import sql from './db.js'
 
 const app = express()
 
@@ -17,21 +19,15 @@ app.use(express.static(path.join(__dirname, '..', '..', 'client', 'dist')))
 sendgrid.setApiKey(process.env.SENDGRID_API_KEY!)
 
 // Session
-const sessionStore = new (connectPgSimple(session))({
-	conString: process.env.POSTGRES_CONNECTION_URL,
-	createTableIfMissing: true,
-	// Keep expired sessions for 8 days (required 7, + 1 more for good measure)
-	pruneSessionInterval: 60 * 60 * 24 * 8,
-	pruneSessionRandomizedInterval: false,
-	// Type definition is missing pruneSessionRandomizedInterval, so we have to assert it
-} as connectPgSimple.PGStoreOptions)
-
 app.use(
 	session({
-		store: sessionStore,
+		store: new (connectPgSimple(session))({
+			conString: process.env.POSTGRES_CONNECTION_URL,
+			createTableIfMissing: true,
+		}),
 		secret: process.env.SESSION_SECRET!,
 		resave: false,
-		saveUninitialized: true,
+		saveUninitialized: false,
 	})
 )
 
@@ -40,9 +36,22 @@ import('./passport.js')
 app.use(passport.initialize())
 app.use(passport.session())
 
+// Update user's last active time on each request
+app.use((req, res, next) => {
+	if (req.user) {
+		sql`
+			UPDATE user_account
+			SET last_active_timestamp = CURRENT_TIMESTAMP
+			WHERE id=${req.user.id}
+		`.execute()
+	}
+	next()
+})
+
 // API
 app.use('/api/auth', authRoute)
 app.use('/api/user', userRoute)
+app.use('/api/data', dataRoute)
 
 // Start
 const port = process.env.PORT

@@ -9,6 +9,14 @@ import { IUser } from '../types.js'
 
 const router = express.Router()
 
+function incrementLoginCount(user: IUser) {
+	sql`
+		UPDATE user_account
+		SET times_logged_in = times_logged_in + 1
+		WHERE id=${user.id}
+	`.execute()
+}
+
 // GET /api/auth/user
 // Get the user of the current session
 // Response JSON: {id, email, displayName, verified}
@@ -28,9 +36,10 @@ router.get('/user', (req, res) => {
 // Log in user with email and password
 // Request JSON: {email, password}
 router.post('/login', (req, res) => {
-	passport.authenticate('local', (err: any, user: IUser | null) => {
+	passport.authenticate('local', (err: any, user: IUser | false) => {
 		if (!user) return res.status(401).send('Invalid username or password.')
 		req.logIn(user, () => {
+			incrementLoginCount(user)
 			res.status(200).send(`Logged in ${user.email}.`)
 		})
 	})(req, res)
@@ -43,6 +52,7 @@ router.get('/google', passport.authenticate('google'))
 // GET /api/auth/google/callback
 // The callback URL that Google sends authentication result to
 router.get('/google/callback', passport.authenticate('google'), (req, res) => {
+	if (req.user) incrementLoginCount(req.user)
 	// TODO
 	res.redirect('http://localhost:5173')
 })
@@ -110,8 +120,11 @@ router.post('/register', async (req, res) => {
 
 // GET /api/auth/verify-email
 // Verify the email of an unverified user
+// Query Params: key
 router.get('/verify-email', async (req, res) => {
 	const key = req.query.key?.toString()
+	// TODO
+	// const key = req.query.key as string
 	if (!key) return res.status(400).send()
 
 	const user = (
