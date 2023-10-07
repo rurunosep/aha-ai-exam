@@ -6,3 +6,5 @@
 .env
 *.session.sql
 scratchpad.js
+.prettierignore
+.vscode

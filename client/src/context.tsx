@@ -1,14 +1,16 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react';
 
 interface ContextType {
-	alert: Alert | null
-	setAlert: (alert: Alert | null) => void
+  alert: Alert | null
+  setAlert: (alert: Alert | null) => void
 }
 
-export const Context = React.createContext({} as ContextType)
+export const Context = React.createContext({} as ContextType);
 
 export function ContextProvider({ children }: { children: React.ReactNode }) {
-	const [alert, setAlert] = useState<Alert | null>(null)
+  const [alert, setAlert] = useState<Alert | null>(null);
 
-	return <Context.Provider value={{ alert, setAlert }}>{children}</Context.Provider>
+  const value = useMemo(() => ({ alert, setAlert }), [alert, setAlert]);
+
+  return <Context.Provider value={value}>{children}</Context.Provider>;
 }
