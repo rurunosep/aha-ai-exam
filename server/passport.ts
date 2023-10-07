@@ -30,7 +30,7 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      callbackURL: '/api/auth/google/callback',
+      callbackURL: `${process.env.SERVER_URL}/api/auth/google/callback`,
       scope: ['email', 'profile'],
     },
     async (_accessToken, _refreshToken, profile, done) => {
@@ -52,7 +52,7 @@ passport.use(
         const newUser = (
           await sql<IUser[]>`
           INSERT INTO user_account (email, google_id, display_name, verified)
-          VALUES (${email}, ${profile.id}, ${profile.name?.givenName || ''}, true)
+          VALUES (${email}, ${profile.id}, ${profile.displayName}, true)
           RETURNING id,
             email,
             google_id AS "googleId",
