@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import passport from 'passport';
 import sendgrid from '@sendgrid/mail';
-import sql from '../db.js';
+import sql from '../modules/db.js';
 import { validatePassword } from '../utils.js';
 import { IUser } from '../types.js';
 

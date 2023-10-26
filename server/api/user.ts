@@ -1,6 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
-import sql from '../db.js';
+import sql from '../modules/db.js';
 import { validatePassword } from '../utils.js';
 
 const router = express.Router();

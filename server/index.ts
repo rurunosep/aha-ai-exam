@@ -1,11 +1,11 @@
+import './modules/env.js';
 import express from 'express';
 import session from 'express-session';
 import connectPgSimple from 'connect-pg-simple';
 import passport from 'passport';
 import sendgrid from '@sendgrid/mail';
 import path from 'path';
-import './config.js';
-import sql from './db.js';
+import sql from './modules/db.js';
 import authRoute from './api/auth.js';
 import userRoute from './api/user.js';
 import dataRoute from './api/data.js';
@@ -31,7 +31,7 @@ app.use(
 );
 
 // Passport
-import('./passport.js');
+import('./modules/passport.js');
 app.use(passport.initialize());
 app.use(passport.session());
 

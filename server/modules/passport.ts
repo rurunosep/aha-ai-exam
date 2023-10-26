@@ -3,7 +3,7 @@ import { Strategy as LocalStrategy } from 'passport-local';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import bcrypt from 'bcrypt';
 import sql from './db.js';
-import { IUser } from './types';
+import { IUser } from '../types.js';
 
 passport.use(
   new LocalStrategy({ usernameField: 'email' }, async (email, password, done) => {

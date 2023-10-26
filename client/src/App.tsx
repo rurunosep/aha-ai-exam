@@ -11,14 +11,12 @@ export default function App() {
 
   const { alert, setAlert } = useContext(Context);
 
-  // Get authenticated user of the current session
   useEffect(() => {
     axios.get('api/auth/user').then((res) => {
       setUser(res.data ? res.data : null);
     });
   }, []);
 
-  //
   const login = useCallback((email: string, password: string) => {
     axios
       .post('api/auth/login', { email, password })
@@ -31,14 +29,12 @@ export default function App() {
       });
   }, []);
 
-  //
   const logout = useCallback(() => {
     axios.get('api/auth/logout').then(() => {
       setUser(null);
     });
   }, []);
 
-  //
   const changeName = useCallback(
     (newName: string) => {
       axios
@@ -51,7 +47,6 @@ export default function App() {
     [user],
   );
 
-  //
   const changePassword = useCallback(
     (oldPassword: string, newPassword: string) => {
       axios
@@ -62,7 +57,6 @@ export default function App() {
     [],
   );
 
-  //
   const register = useCallback((email: string, password: string) => {
     axios
       .post('api/auth/register', { email, password })
@@ -73,7 +67,6 @@ export default function App() {
       .catch((err) => setAlert({ message: err.response.data, type: 'danger' }));
   }, []);
 
-  //
   const alertElement = alert && (
     <div className={`alert alert-${alert.type} alert-dismissible`} role="alert">
       {alert.message}
